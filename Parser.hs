@@ -54,7 +54,7 @@ symbol p = do
     return n
 
 definition cx = do
-    n <- var cx
+    n <- var cx P.+++ (fmap (:cx) $ tok (P.char '(') *> operator <* tok (P.char ')'))
     tok (string "=")
     def <- expr cx
     return (n,def)
