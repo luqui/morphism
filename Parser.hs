@@ -1,4 +1,4 @@
-module Parser (expr) where
+module Parser (expr, definition, parse) where
 
 import Term
 import Text.ParserCombinators.ReadP as P
@@ -13,19 +13,14 @@ instance Applicative P.ReadP where
 tok :: P.ReadP a -> P.ReadP a
 tok p = p <* P.skipSpaces
 
+var cx = (:cx) <$> tok identifier
+
 atom :: Name -> P.ReadP Term
-atom cx = var P.+++ lambda P.+++ parens P.+++ g P.+++ l
+atom cx = (Free <$> var cx) P.+++ parens P.+++ g P.+++ l
     where
-    var = Free . (:cx) <$> tok identifier
-    lambda = do
-        tok (P.char '\\')
-        name <- tok identifier
-        tok (P.char '.')
-        body <- expr cx
-        return $ Lambda (abstract (name:cx) body)
     parens = tok (P.char '(') *> expr cx <* tok (P.char ')')
-    g = tok (P.char 'G') *> pure G
-    l = tok (P.char 'L') *> pure L
+    g = tok (symbol "G") *> pure G
+    l = tok (symbol "L") *> pure L
 
 appExpr :: Name -> P.ReadP Term
 appExpr cx = foldl1 Apply <$> many1 (atom cx)
@@ -38,12 +33,33 @@ opExpr cx = do
     return (Apply (Apply (Free (op:cx)) l) r)
 
 expr :: Name -> P.ReadP Term
-expr cx = appExpr cx P.+++ opExpr cx
+expr cx = appExpr cx P.+++ opExpr cx P.+++ lambda
+    where
+    lambda = do
+        tok (P.char '\\')
+        name <- tok identifier
+        tok (P.char '.')
+        body <- expr cx
+        return $ Lambda (abstract (name:cx) body)
     
 
 identifier = do
-    n <- P.munch Char.isAlphaNum 
+    n <- P.munch1 Char.isAlphaNum 
     guard (n /= "G" && n /= "L")
     return n
 
-operator = P.munch (\c -> not (Char.isSpace c) && not (Char.isAlphaNum c))
+symbol p = do
+    n <- P.munch1 Char.isAlphaNum
+    guard (n == p)
+    return n
+
+definition cx = do
+    n <- var cx
+    tok (string "=")
+    def <- expr cx
+    return (n,def)
+
+operator = P.munch1 (\c -> not (Char.isSpace c) && not (Char.isAlphaNum c) && not (c `elem` "()\\.="))
+
+parse :: Name -> String -> Term
+parse name input = head [ x | (x,[]) <- P.readP_to_S (expr name) input ]

@@ -1,5 +1,6 @@
-module Term (Name, Term(..), Scope, abstract, instantiate, substitute)
-where
+module Term (Name, Term(..), Scope, (===), showTerm, abstract, instantiate, substitute, whnf) where
+
+import Data.List (intercalate)
 
 type Name = [String]
 
@@ -9,8 +10,27 @@ data Term
     | Lambda Scope
     | Apply Term Term
     | G | L
+    deriving Eq
 
-newtype Scope = Scope Term
+newtype Scope = Scope Term deriving Eq
+
+(===) :: Term -> Term -> Bool
+t === u = normalForm ["=="] t == normalForm ["=="] u
+
+instance Show Term where show = showTerm
+
+showTerm :: Term -> String
+showTerm = go False False
+    where
+    go ap lp (Free n) = intercalate ":" (reverse n)
+    go ap lp (Bound z) = show z
+    go ap lp (Lambda (Scope body)) = parens lp $ "\\." ++ go False False body
+    go ap lp (Apply t u) = parens ap $ go False True t ++ " " ++ go True True u
+    go ap lp G = "G"
+    go ap lp L = "L"
+
+    parens False x = x
+    parens True x = "(" ++ x ++ ")" 
 
 abstract :: Name -> Term -> Scope
 abstract name exp = Scope $ go 0 exp
@@ -31,3 +51,22 @@ instantiate new (Scope body) = go 0 body where
 
 substitute :: Term -> Name -> Term -> Term
 substitute image name = instantiate image . abstract name
+
+whnf :: Term -> Term
+whnf (Apply f x) = 
+    case whnf f of
+        Lambda body -> whnf (instantiate x body)
+        -- L and G are strict in all their arguments
+        L -> Apply L (whnf x)
+        G -> Apply G (whnf x)
+        Apply G a -> Apply (Apply G a) (whnf x)
+        Apply (Apply G a) b -> Apply (Apply (Apply G a) b) (whnf x)
+        y -> Apply y x
+whnf x = x
+
+normalForm :: Name -> Term -> Term
+normalForm name t =
+    case whnf t of
+        Lambda scope -> Lambda . abstract ("0":name) . normalForm ("0":name) . instantiate (Free ("0":name)) $ scope
+        Apply x y -> Apply (normalForm ("0":name) x) (normalForm ("1":name) y)
+        x -> x
