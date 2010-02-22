@@ -27,9 +27,9 @@ appExpr cx = foldl1 Apply <$> many1 (atom cx)
 
 opExpr :: Name -> P.ReadP Term
 opExpr cx = do
-    l <- atom cx
+    l <- appExpr cx
     op <- tok operator
-    r <- atom cx
+    r <- appExpr cx
     return (Apply (Apply (Free (op:cx)) l) r)
 
 expr :: Name -> P.ReadP Term

@@ -7,6 +7,8 @@ import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Error
+import Control.Monad (unless)
+import Control.Applicative
 import Term
 import Parser
 import Debug.Trace
@@ -30,26 +32,35 @@ getEnvironment = Prove ask
 showEnv :: Map.Map Name Term -> String
 showEnv = intercalate "\n" . map (\(k,v) -> showTerm (v `Apply` Free k)) . Map.toList
 
+inferType :: Term -> Maybe (Prove Term)
+inferType (Free x) = return $ (Map.! x) <$> getEnvironment
+inferType (Apply t u) = do
+    thastype <- inferType t
+    return $ do
+        G `Apply` a `Apply` b <- whnf <$> thastype
+        trace ("*** " ++ showTerm (normalForm ["show"] (b `Apply` u `Apply` (t `Apply` u))) ++ "\n") $ return ()
+        return $ b `Apply` u
+inferType _ = Nothing
+
 prove :: Term -> Prove ()
 prove goal = do
     env <- getEnvironment
     case whnf goal of
         t | trace (showEnv env ++ "\n|- " ++ showTerm t ++ "\n") False -> undefined
-        (x `Apply` y) | Free y' <- whnf y
-                      , Just x' <- Map.lookup y' env
-                      , x === x' -> return ()
-        x -> go x
-    where
-    go (L `Apply` L) = return ()
-    go (L `Apply` (G `Apply` a `Apply` b)) = do
-        prove (L `Apply` a)
-        var <- fresh
-        withBinding var a . prove . whnf $ L `Apply` (b `Apply` Free var)
-    go (G `Apply` a `Apply` b `Apply` c) = do
-        prove (L `Apply` a)
-        var <- fresh
-        withBinding var a . prove . whnf $ b `Apply` Free var `Apply` (c `Apply` Free var)
-    go goal = fail $ "Unable to prove subgoal: " ++ showTerm goal
+        x `Apply` y | Just ytype <- inferType (whnf y) -> do
+            ytype' <- ytype
+            unless (x === ytype') . fail $ "Types do not match: " ++ showTerm x ++ " /= " ++ showTerm ytype'
+        L `Apply` l | l === Lambda (Scope (L `Apply` L)) -> return ()
+        L `Apply` L -> return ()
+        L `Apply` (G `Apply` a `Apply` b) -> do
+            prove (L `Apply` a)
+            var <- fresh
+            withBinding var a . prove $ L `Apply` (b `Apply` Free var)
+        G `Apply` a `Apply` b `Apply` c -> do
+            prove (L `Apply` a)
+            var <- fresh
+            withBinding var a . prove $ b `Apply` Free var `Apply` (c `Apply` Free var)
+        goal -> fail $ "Unable to prove subgoal: " ++ showTerm goal
 
 runProve :: Name -> Prove a -> Either String a
 runProve name (Prove pf) = evalState (runErrorT (runReaderT (runReaderT pf Map.empty) name)) 0

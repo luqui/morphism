@@ -1,4 +1,4 @@
-module Term (Name, Term(..), Scope, (===), showTerm, abstract, instantiate, substitute, whnf) where
+module Term (Name, Term(..), Scope(..), (===), showTerm, abstract, instantiate, substitute, whnf, normalForm) where
 
 import Data.List (intercalate)
 

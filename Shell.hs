@@ -15,11 +15,14 @@ main = Line.initialise >> evalStateT go Map.empty
     where
     go = do
         line <- lift $ Line.getLineEdited ">>> "
+        if line == Just "" then go else do
         env <- get
         case fmap (parseLine env) line of
             Nothing -> return ()
             Just Nothing -> lift (putStrLn "Parse Error") >> go
-            Just (Just (Left (name, term))) -> modify (Map.insert name term) >> go
+            Just (Just (Left (name, term))) -> do
+                lift . putStrLn $ head name ++ " = " ++ showTerm term
+                modify (Map.insert name term) >> go
             Just (Just (Right term)) -> do
                 res <- return $ runProve ["P"] (prove term)
                 case res of
