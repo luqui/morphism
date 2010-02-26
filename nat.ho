@@ -1,28 +1,28 @@
-zero = \f. \x. x
-succ = \n. \f. \x. f (n f x)
+zero = \f x. x
+succ = \n f x. f (n f x)
 
-just = \x. \n. \j. j x
-nothing = \n. \j. n
+just = \x n j. j x
+nothing = \n j. n
 
 U = \x. L L
-(~>) = \t. \u. G t (\x. u)
+(~>) = \t u. G t (\x. u)
 Type = U ~> L
-(::) = \x. \y. y x
-(->) = \a. \b. \f. G U (\x. a x ~> b (f x))
+(::) = \x y. y x
+(->) = \a b f. G U (\x. a x ~> b (f x))
 
-(*) = \f. \g. \x. f (g x)
+(*) = \f g x. f (g x)
 
-Mu = \f. \n. G Type (\p. G U (\x. f p x ~> p x) ~> p n)
+Mu = \f n. G Type (\p. G U (\x. f p x ~> p x) ~> p n)
 
-Maybe = \a. \n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
+Maybe = \a n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
 
-typeNothing = \a. \p. \pn. \pj. pn
+typeNothing = \a p pn pj. pn
 G Type (\a. nothing :: Maybe a) typeNothing
 
-typeJust = \a. \x. \ax. \p. \pn. \pj. pj x ax
+typeJust = \a x ax p pn pj. pj x ax
 G Type (\a. just :: (a -> Maybe a)) typeJust
 
-funapp = \a. \b. \f. \abf. \x. \ax. abf x ax
+funapp = \a b f abf x ax. abf x ax
 G Type (\a. G Type (\b. G U (\f. (a -> b) f ~> G U (\x. a x ~> b (f x))))) funapp
 
 G Type (\a. just nothing :: Maybe (Maybe a)) (\a. funapp a (Maybe a) just (typeJust (Maybe a)) nothing (typeNothing a))

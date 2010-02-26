@@ -10,6 +10,11 @@ instance Applicative P.ReadP where
     pure = return
     (<*>) = ap
 
+skipSpace = P.skipSpaces >> P.option () comment
+    where
+    comment = tok lineComment >> return ()
+    lineComment = P.string "--" >> P.munch (/= '\n')
+
 tok :: P.ReadP a -> P.ReadP a
 tok p = p <* P.skipSpaces
 
@@ -37,10 +42,10 @@ expr cx = appExpr cx P.+++ opExpr cx P.+++ lambda
     where
     lambda = do
         tok (P.char '\\')
-        name <- tok identifier
+        names <- many1 (tok identifier)
         tok (P.char '.')
         body <- expr cx
-        return $ Lambda (abstract (name:cx) body)
+        return $ foldr (\n -> Lambda . abstract (n:cx)) body names
     
 
 identifier = do
