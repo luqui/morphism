@@ -1,0 +1,34 @@
+Morphism is an experimental, purely functional programming language.  It is not
+sure what it is experimenting with just yet, but at the very least, the
+following principles are being toyed with:
+
+(1) Extensional:  There are *no* intensional objects, as seen in
+basically every language ever, created with C-syntax "keyword Name"
+declarators:
+
+    data Foo = Foo | Bar
+    class Baz a where
+    module Moo where
+
+All of the above have intension, meaning you cannot replace them with
+their definition because their name (+ scope) is part of the definition.
+This makes them much harder to abstract over.
+
+(2) Uniform abstraction:  Hitchhiking on the extensional property, every
+kind of object can be passed to and returned from lambdas.  Further,
+repeated code can *always* be beta converted out.  This seems to imply
+that there are some untyped lambdas, because you can't give a type to
+everything that is conceivable to factor out.
+
+(3) Everything is serializable.  It is nonsense for a purely functional
+language not to have this property.  I mean, come on.
+
+(4) The database of everything:  Purely functional languages have the
+marvelous property that, because you have to state all your inputs and
+outputs explicitly, that every piece of code -- every function, helper
+function, type, ...  -- can be reused.  Unfortunately no popular
+(haha... popular) languages have mechanisms which permit such obvious
+and painless reuse of code.  So I would like some sort of databasey or
+Udony thing which really facilitates code reuse *at all scales*.  Not
+just large, encapsualted libraries, but at the miniature abstract data
+type with a few operations level, down to the one-liner level.
