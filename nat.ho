@@ -1,26 +1,23 @@
-zero = \f x. x
-succ = \n f x. f (n f x)
-
-just = \x n j. j x
-nothing = \n j. n
-
 U = \x. L L
 (~>) = \t u. G t (\x. u)
 Type = U ~> L
 (::) = \x y. y x
 (->) = \a b f. G U (\x. a x ~> b (f x))
 
-(*) = \f g x. f (g x)
+forall = \dom f x. G dom (\t. x :: f t)
 
 Mu = \f n. G Type (\p. G U (\x. f p x ~> p x) ~> p n) -- least fixed point type
+
+just = \x n j. j x
+nothing = \n j. n
 
 Maybe = \a n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
 
 typeNothing = \a p pn pj. pn
-G Type (\a. nothing :: Maybe a) typeNothing
+(nothing :: forall Type (\a. Maybe a))   typeNothing
 
 typeJust = \a x ax p pn pj. pj x ax
-G Type (\a. just :: (a -> Maybe a)) typeJust
+(just :: forall Type (\a. a -> Maybe a)) typeJust
 
 funapp = \a b f abf x ax. abf x ax
 G Type (\a. G Type (\b. G U (\f. (a -> b) f ~> G U (\x. a x ~> b (f x))))) funapp

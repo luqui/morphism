@@ -31,9 +31,9 @@ appExpr cx = foldl1 Apply <$> many1 (atom cx)
 opExpr :: Name -> P.ReadP Term
 opExpr cx = do
     l <- appExpr cx
-    op <- operator
+    op <- infixExpr cx
     r <- appExpr cx
-    return $ (Free (op:cx) `Apply` l) `Apply` r
+    return $ (op `Apply` l) `Apply` r
 
 expr :: Name -> P.ReadP Term
 expr cx = appExpr cx P.+++ opExpr cx P.+++ lambda
@@ -49,7 +49,7 @@ reservedWords = ["G", "L"]
 
 identifier = tok $ P.munch1 Char.isAlphaNum
 
-name cx = fmap (:cx) $ constrain (not . (`elem` reservedWords)) identifier 
+name cx = fmap (:cx) $ constrain (not . (`elem` reservedWords)) identifier
                           P.+++ 
                        (tok (P.char '(') *> operator <* tok (P.char ')'))
 
@@ -64,9 +64,13 @@ definition cx = do
     def <- expr cx
     return (n,def)
 
-operatorLike = tok (P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "()")))
+operatorLike = tok (P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}")))
 
-operator = constrain (not . (`elem` ["=", "--"])) operatorLike
+operator = (constrain (not . (`elem` ["=", "--"])) operatorLike)
+
+infixExpr cx = (Free . (:cx) <$> operator)
+                  P.+++
+               (tok (P.char '{') *> expr cx <* tok (P.char '}'))
 
 parse :: Name -> String -> Term
 parse name input = head [ x | (x,[]) <- P.readP_to_S (expr name) input ]
