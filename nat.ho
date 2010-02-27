@@ -6,6 +6,11 @@ Type = U ~> L
 
 forall = \dom f x. G dom (\t. x :: f t)
 
+(,) = \a b f. f a b
+theorem = \thm pf. (thm, pf)
+check = \t. t (\thm pf. thm pf)
+proof = \t. t (\thm pf. pf)
+
 Mu = \f n. G Type (\p. G U (\x. f p x ~> p x) ~> p n) -- least fixed point type
 
 just = \x n j. j x
@@ -13,16 +18,16 @@ nothing = \n j. n
 
 Maybe = \a n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
 
-typeNothing = \a p pn pj. pn
-(nothing :: forall Type (\a. Maybe a))   typeNothing
+typeNothing = theorem (nothing :: forall Type (\a. Maybe a)) (\a p pn pj. pn)
+check typeNothing
 
-typeJust = \a x ax p pn pj. pj x ax
-(just :: forall Type (\a. a -> Maybe a)) typeJust
+typeJust = theorem (just :: forall Type (\a. a -> Maybe a)) (\a x ax p pn pj. pj x ax)
+check typeJust
 
-funapp = \a b f abf x ax. abf x ax
-G Type (\a. G Type (\b. G U (\f. (a -> b) f ~> G U (\x. a x ~> b (f x))))) funapp
+funapp = theorem (G Type (\a. G Type (\b. G U (\f. (a -> b) f ~> G U (\x. a x ~> b (f x)))))) (\a b f abf x ax. abf x ax)
+check funapp
 
-G Type (\a. just nothing :: Maybe (Maybe a)) (\a. funapp a (Maybe a) just (typeJust (Maybe a)) nothing (typeNothing a))
+G Type (\a. just nothing :: Maybe (Maybe a)) (\a. proof funapp a (Maybe a) just (proof typeJust (Maybe a)) nothing (proof typeNothing a))
 
 Nat = Mu Maybe
 Type Nat
