@@ -12,7 +12,7 @@ Type = U ~> L
 
 (*) = \f g x. f (g x)
 
-Mu = \f n. G Type (\p. G U (\x. f p x ~> p x) ~> p n)
+Mu = \f n. G Type (\p. G U (\x. f p x ~> p x) ~> p n) -- this is a comment
 
 Maybe = \a n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
 

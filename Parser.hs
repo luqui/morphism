@@ -10,22 +10,20 @@ instance Applicative P.ReadP where
     pure = return
     (<*>) = ap
 
-skipSpace = P.skipSpaces >> P.option () comment
+skipSpace = P.munch Char.isSpace >> P.option () comment
     where
-    comment = tok lineComment >> return ()
-    lineComment = P.string "--" >> P.munch (/= '\n')
+    comment = lineComment >> return ()
+    lineComment = constrain (== "--") operatorLike >> P.munch (/= '\n') >> tok (P.char '\n')
 
 tok :: P.ReadP a -> P.ReadP a
-tok p = p <* P.skipSpaces
-
-var cx = (:cx) <$> tok identifier
+tok p = p <* skipSpace
 
 atom :: Name -> P.ReadP Term
-atom cx = (Free <$> var cx) P.+++ parens P.+++ g P.+++ l
+atom cx = (Free <$> name cx) P.+++ parens P.+++ g P.+++ l
     where
     parens = tok (P.char '(') *> expr cx <* tok (P.char ')')
-    g = tok (symbol "G") *> pure G
-    l = tok (symbol "L") *> pure L
+    g = constrain (== "G") identifier *> pure G
+    l = constrain (== "L") identifier *> pure L
 
 appExpr :: Name -> P.ReadP Term
 appExpr cx = foldl1 Apply <$> many1 (atom cx)
@@ -33,38 +31,42 @@ appExpr cx = foldl1 Apply <$> many1 (atom cx)
 opExpr :: Name -> P.ReadP Term
 opExpr cx = do
     l <- appExpr cx
-    op <- tok operator
+    op <- operator
     r <- appExpr cx
-    return (Apply (Apply (Free (op:cx)) l) r)
+    return $ (Free (op:cx) `Apply` l) `Apply` r
 
 expr :: Name -> P.ReadP Term
 expr cx = appExpr cx P.+++ opExpr cx P.+++ lambda
     where
     lambda = do
         tok (P.char '\\')
-        names <- many1 (tok identifier)
+        names <- many1 (name cx)
         tok (P.char '.')
         body <- expr cx
-        return $ foldr (\n -> Lambda . abstract (n:cx)) body names
+        return $ foldr (\n -> Lambda . abstract n) body names
     
+reservedWords = ["G", "L"]
 
-identifier = do
-    n <- P.munch1 Char.isAlphaNum 
-    guard (n /= "G" && n /= "L")
-    return n
+identifier = tok $ P.munch1 Char.isAlphaNum
 
-symbol p = do
-    n <- P.munch1 Char.isAlphaNum
-    guard (n == p)
+name cx = fmap (:cx) $ constrain (not . (`elem` reservedWords)) identifier 
+                          P.+++ 
+                       (tok (P.char '(') *> operator <* tok (P.char ')'))
+
+constrain f p = do
+    n <- p
+    guard (f n)
     return n
 
 definition cx = do
-    n <- var cx P.+++ (fmap (:cx) $ tok (P.char '(') *> operator <* tok (P.char ')'))
-    tok (string "=")
+    n <- name cx
+    constrain (== "=") operatorLike
     def <- expr cx
     return (n,def)
 
-operator = P.munch1 (\c -> not (Char.isSpace c) && not (Char.isAlphaNum c) && not (c `elem` "()\\.="))
+operatorLike = tok (P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "()")))
+
+operator = constrain (not . (`elem` ["=", "--"])) operatorLike
 
 parse :: Name -> String -> Term
 parse name input = head [ x | (x,[]) <- P.readP_to_S (expr name) input ]

@@ -29,7 +29,7 @@ main = Line.initialise >> evalStateT go Map.empty
                     Left err -> lift $ putStrLn err
                     Right () -> lift $ putStrLn "OK"
                 go
-    parseLine env line = listToMaybe [ x | (x,[]) <- P.readP_to_S (parser env) line ]
+    parseLine env line = listToMaybe [ x | (x,[]) <- P.readP_to_S (parser env) (line ++ "\n") ]
     parser env = defn P.+++ check
         where
         defn = (Left . second (substs env)) `fmap` definition []
