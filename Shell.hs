@@ -16,16 +16,14 @@ import Data.List (intercalate)
 main = Line.initialise >> evalStateT go Map.empty
     where
     go = do
-        line <- lift $ Line.getLineEdited ">>> "
-        if line == Just "" then go else do
+        line <- lift $ fmap concat getParagraph
         env <- get
-        case fmap (parseLine env) line of
-            Nothing -> return ()
-            Just Nothing -> lift (putStrLn "Parse Error") >> go
-            Just (Just (Left (name, term))) -> do
+        case parseLine env line of
+            Nothing -> lift (putStrLn "Parse Error") >> go
+            Just (Left (name, term)) -> do
                 lift . putStrLn $ head name ++ " = " ++ showTerm term
                 modify (Map.insert name term) >> go
-            Just (Just (Right term)) -> do
+            Just (Right term) -> do
                 res <- return $ runProve ["P"] (prove term)
                 case res of
                     Left err -> lift $ putStrLn err
@@ -43,6 +41,14 @@ main = Line.initialise >> evalStateT go Map.empty
         where
         defn = (Left . second (substs env)) `fmap` definition []
         check = (Right . substs env) `fmap` expr []
+
+    getParagraph = do
+        Just line <- Line.getLineEdited ">>> "
+        if null line then getParagraph else do
+        let rest = do
+                Just line' <- Line.getLineEdited "... "
+                if null line' then return [] else fmap (line':) rest
+        fmap (line:) rest
 
 substs :: Map.Map Name Term -> Term -> Term
 substs mp t = Map.foldWithKey (\k v -> substitute v k) t mp
