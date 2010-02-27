@@ -1,7 +1,7 @@
 module Parser (expr, definition, parse) where
 
 import Term
-import Text.ParserCombinators.ReadP as P
+import qualified Text.ParserCombinators.ReadP as P
 import qualified Data.Char as Char
 import Control.Monad (guard, ap)
 import Control.Applicative
@@ -26,7 +26,7 @@ atom cx = (Free <$> name cx) P.+++ parens P.+++ g P.+++ l
     l = constrain (== "L") identifier *> pure L
 
 appExpr :: Name -> P.ReadP Term
-appExpr cx = foldl1 Apply <$> many1 (atom cx)
+appExpr cx = foldl1 Apply <$> P.many1 (atom cx)
 
 opExpr :: Name -> P.ReadP Term
 opExpr cx = do
@@ -40,7 +40,7 @@ expr cx = appExpr cx P.+++ opExpr cx P.+++ lambdaExpr cx
 
 lambdaExpr cx = do
     tok (P.char '\\')
-    names <- many1 (name cx)
+    names <- P.many1 (name cx)
     tok (P.char '.')
     body <- expr cx
     return $ foldr (\n -> Lambda . abstract' n) body names

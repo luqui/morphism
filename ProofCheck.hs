@@ -33,7 +33,7 @@ showEnv :: Map.Map Name Term -> String
 showEnv = intercalate "\n" . map (\(k,v) -> showTerm (v `Apply` Free k)) . Map.toList
 
 inferType :: Term -> Maybe (Prove Term)
-inferType (Free x) = return $ (Map.! x) <$> getEnvironment
+inferType (Free x) = return $ maybe (fail $ "Undefined identifier: " ++ showTerm (Free x)) return =<< Map.lookup x <$> getEnvironment
 inferType (Apply t u) = do
     thastype <- inferType t
     return $ do
