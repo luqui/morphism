@@ -38,7 +38,7 @@ inferType (Apply t u) = do
     thastype <- inferType t
     return $ do
         G `Apply` a `Apply` b <- whnf <$> thastype
-        trace ("*** " ++ showTerm (normalForm ["show"] (b `Apply` u `Apply` (t `Apply` u))) ++ "\n") $ return ()
+        --trace ("*** " ++ showTerm (normalForm ["show"] (b `Apply` u `Apply` (t `Apply` u))) ++ "\n") $ return ()
         return $ b `Apply` u
 inferType _ = Nothing
 
@@ -46,7 +46,7 @@ prove :: Term -> Prove ()
 prove goal = do
     env <- getEnvironment
     case whnf goal of
-        t | trace (showEnv env ++ "\n|- " ++ showTerm t ++ "\n") False -> undefined
+        -- t | trace (showEnv env ++ "\n|- " ++ showTerm t ++ "\n") False -> undefined
         x `Apply` y | Just ytype <- inferType (whnf y) -> do
             ytype' <- ytype
             unless (x === ytype') . fail $ "Types do not match: " ++ showTerm x ++ " /= " ++ showTerm ytype'

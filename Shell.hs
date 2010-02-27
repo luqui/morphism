@@ -21,7 +21,7 @@ main = Line.initialise >> evalStateT go Map.empty
         case parseLine env line of
             Nothing -> lift (putStrLn "Parse Error") >> go
             Just (Left (name, term)) -> do
-                lift . putStrLn $ head name ++ " = " ++ showTerm term
+                -- lift . putStrLn $ head name ++ " = " ++ showTerm term
                 modify (Map.insert name term) >> go
             Just (Right term) -> do
                 res <- return $ runProve ["P"] (prove term)
