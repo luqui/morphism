@@ -43,11 +43,16 @@ lambdaExpr cx = do
     names <- many1 (name cx)
     tok (P.char '.')
     body <- expr cx
-    return $ foldr (\n -> Lambda . abstract n) body names
+    return $ foldr (\n -> Lambda . abstract' n) body names
+
+    where
+    -- don't abstract over underscores
+    abstract' ("_":_) = Scope
+    abstract' n = abstract n
     
 reservedWords = ["G", "L"]
 
-identifier = tok $ P.munch1 Char.isAlphaNum
+identifier = tok $ P.munch1 (\c -> Char.isAlphaNum c || (c `elem` "'_"))
 
 name cx = fmap (:cx) $ constrain (not . (`elem` reservedWords)) identifier
                           P.+++ 
@@ -64,7 +69,7 @@ definition cx = do
     def <- expr cx
     return (n,def)
 
-operatorLike = P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}"))
+operatorLike = P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}'_"))
 
 operator = (constrain (not . (`elem` ["=", "--"])) (tok operatorLike))
 
