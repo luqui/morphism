@@ -10,6 +10,8 @@ import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Control.Arrow
 import Data.Maybe (listToMaybe)
+import Debug.Trace
+import Data.List (intercalate)
 
 main = Line.initialise >> evalStateT go Map.empty
     where
@@ -29,7 +31,14 @@ main = Line.initialise >> evalStateT go Map.empty
                     Left err -> lift $ putStrLn err
                     Right () -> lift $ putStrLn "OK"
                 go
-    parseLine env line = listToMaybe [ x | (x,[]) <- P.readP_to_S (parser env) (line ++ "\n") ]
+    parseLine env line = 
+        case results of
+            [x] -> Just x
+            [] -> Nothing
+            ps -> trace ("Multiple Parses:\n" ++ intercalate "\n" (map show ps)) $ Nothing
+        where
+        results = map fst . filter (null . snd) $ P.readP_to_S (parser env) (line ++ "\n")
+    
     parser env = defn P.+++ check
         where
         defn = (Left . second (substs env)) `fmap` definition []

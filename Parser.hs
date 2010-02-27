@@ -32,18 +32,18 @@ opExpr :: Name -> P.ReadP Term
 opExpr cx = do
     l <- appExpr cx
     op <- infixExpr cx
-    r <- appExpr cx
+    r <- appExpr cx P.+++ lambdaExpr cx
     return $ (op `Apply` l) `Apply` r
 
 expr :: Name -> P.ReadP Term
-expr cx = appExpr cx P.+++ opExpr cx P.+++ lambda
-    where
-    lambda = do
-        tok (P.char '\\')
-        names <- many1 (name cx)
-        tok (P.char '.')
-        body <- expr cx
-        return $ foldr (\n -> Lambda . abstract n) body names
+expr cx = appExpr cx P.+++ opExpr cx P.+++ lambdaExpr cx
+
+lambdaExpr cx = do
+    tok (P.char '\\')
+    names <- many1 (name cx)
+    tok (P.char '.')
+    body <- expr cx
+    return $ foldr (\n -> Lambda . abstract n) body names
     
 reservedWords = ["G", "L"]
 
