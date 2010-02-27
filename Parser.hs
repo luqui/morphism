@@ -60,13 +60,13 @@ constrain f p = do
 
 definition cx = do
     n <- name cx
-    constrain (== "=") operatorLike
+    constrain (== "=") (tok operatorLike)
     def <- expr cx
     return (n,def)
 
-operatorLike = tok (P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}")))
+operatorLike = P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}"))
 
-operator = (constrain (not . (`elem` ["=", "--"])) operatorLike)
+operator = (constrain (not . (`elem` ["=", "--"])) (tok operatorLike))
 
 infixExpr cx = (Free . (:cx) <$> operator)
                   P.+++
