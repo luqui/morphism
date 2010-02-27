@@ -1,6 +1,7 @@
-module Term (Name, Term(..), Scope(..), (===), showTerm, abstract, instantiate, substitute, whnf, normalForm) where
+module Term (Name, Term(..), Scope(..), (===), showTerm, abstract, instantiate, substitute, freeVars, whnf, normalForm) where
 
 import Data.List (intercalate)
+import qualified Data.Set as Set
 
 type Name = [String]
 
@@ -51,6 +52,12 @@ instantiate new (Scope body) = go 0 body where
 
 substitute :: Term -> Name -> Term -> Term
 substitute image name = instantiate image . abstract name
+
+freeVars :: Term -> Set.Set Name
+freeVars (Free n) = Set.singleton n
+freeVars (Lambda (Scope t)) = freeVars t
+freeVars (Apply t u) = freeVars t `Set.union` freeVars u
+freeVars _ = Set.empty
 
 whnf :: Term -> Term
 whnf (Apply f x) = 

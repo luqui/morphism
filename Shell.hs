@@ -6,6 +6,7 @@ import Term
 import Parser
 import qualified Text.ParserCombinators.ReadP as P
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Control.Arrow
@@ -20,9 +21,11 @@ main = Line.initialise >> evalStateT go Map.empty
         env <- get
         case parseLine env line of
             Nothing -> lift (putStrLn "Parse Error") >> go
-            Just (Left (name, term)) -> do
-                -- lift . putStrLn $ head name ++ " = " ++ showTerm term
-                modify (Map.insert name term) >> go
+            Just (Left (name, term))
+                | Set.null (freeVars term) -> modify (Map.insert name term) >> go
+                | otherwise -> do
+                    lift . putStrLn $ "Error: term is not closed.  Free variables: " ++ intercalate ", " (map (showTerm . Free) (Set.toList (freeVars term)))
+                    go
             Just (Right term) -> do
                 res <- return $ runProve ["P"] (prove term)
                 case res of
