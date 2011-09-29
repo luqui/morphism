@@ -30,20 +30,19 @@ Maybe = \a n. G Type (\p. p nothing ~> (G U (\x. a x ~> p (just x)) ~> p n))
 
 typeNothing = theorem (nothing :: forall Type (\a. Maybe a)) (\a p pn pj. pn)
 
-check typeNothing
+! check typeNothing
 
 typeJust = theorem (just :: forall Type (\a. a -> Maybe a)) (\a x ax p pn pj. pj x ax)
 
-check typeJust
+! check typeJust
 
 funapp = theorem (G Type (\a. G Type (\b. G U (\f. (a -> b) f ~> G U (\x. a x ~> b (f x)))))) (\a b f abf x ax. abf x ax)
 
-check funapp
-
-G Type (\a. just nothing :: Maybe (Maybe a)) (\a. proof funapp a (Maybe a) just (proof typeJust (Maybe a)) nothing (proof typeNothing a))
+! check funapp
+! G Type (\a. just nothing :: Maybe (Maybe a)) (\a. proof funapp a (Maybe a) just (proof typeJust (Maybe a)) nothing (proof typeNothing a))
 
 Nat = Mu Maybe
 
-Type Nat
+! Type Nat
 
 

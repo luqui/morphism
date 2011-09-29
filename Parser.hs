@@ -1,81 +1,78 @@
-module Parser (expr, definition, parse) where
+module Parser (expr, definition, check, parse) where
 
 import Term
-import qualified Text.ParserCombinators.ReadP as P
+import qualified Text.Parsec as P
+import qualified Text.Parsec.Token as P
 import qualified Data.Char as Char
 import Control.Monad (guard, ap)
 import Control.Applicative
 
-instance Applicative P.ReadP where
-    pure = return
-    (<*>) = ap
+type Parser = P.Parsec String ()
 
-skipSpace = P.munch Char.isSpace >> P.option () comment
+tok = P.makeTokenParser $ P.LanguageDef {
+        P.commentStart = "{-",
+        P.commentEnd = "-}",
+        P.commentLine = "--",
+        P.nestedComments = True,
+        P.identStart = P.letter <|> P.oneOf "_",
+        P.identLetter = P.alphaNum <|> P.oneOf "_-'",
+        P.opStart = opChars,
+        P.opLetter = opChars,
+        P.reservedNames = ["L","G"],
+        P.reservedOpNames = ["=","\\"],
+        P.caseSensitive = True
+    }
     where
-    comment = lineComment >> return ()
-    lineComment = constrain (== "--") operatorLike >> P.munch (/= '\n') >> tok (P.char '\n')
+    opChars = P.oneOf "~!@#$%^&*-=+\\|;:<>,./?"
 
-tok :: P.ReadP a -> P.ReadP a
-tok p = p <* skipSpace
-
-atom :: Name -> P.ReadP Term
-atom cx = (Free <$> name cx) P.+++ parens P.+++ g P.+++ l
+atom :: Name -> Parser Term
+atom cx = P.choice [
+        Free <$> name cx, 
+        parens,
+        P.reserved tok "G" *> pure G,
+        P.reserved tok "L" *> pure L
+    ]
     where
-    parens = tok (P.char '(') *> expr cx <* tok (P.char ')')
-    g = constrain (== "G") identifier *> pure G
-    l = constrain (== "L") identifier *> pure L
+    parens = P.symbol tok "(" *> expr cx <* P.symbol tok ")"
 
-appExpr :: Name -> P.ReadP Term
-appExpr cx = foldl1 Apply <$> P.many1 (atom cx)
+appExpr :: Name -> Parser Term
+appExpr cx = P.choice [
+        foldl1 Apply <$> P.many1 (atom cx),
+        lambdaExpr cx
+    ]
 
-opExpr :: Name -> P.ReadP Term
-opExpr cx = do
-    l <- appExpr cx
-    op <- infixExpr cx
-    r <- appExpr cx P.+++ lambdaExpr cx
-    return $ (op `Apply` l) `Apply` r
+opExpr :: Name -> Parser Term
+opExpr cx = P.chainl1 (appExpr cx) op
+    where
+    op = (\o a b -> (o `Apply` a) `Apply` b) <$> infixExpr cx 
 
-expr :: Name -> P.ReadP Term
-expr cx = appExpr cx P.+++ opExpr cx P.+++ lambdaExpr cx
+expr :: Name -> Parser Term
+expr = opExpr
 
 lambdaExpr cx = do
-    tok (P.char '\\')
+    P.reservedOp tok "\\"
     names <- P.many1 (name cx)
-    tok (P.char '.')
+    P.symbol tok "."
     body <- expr cx
     return $ foldr (\n -> Lambda . abstract' n) body names
-
     where
     -- don't abstract over underscores
     abstract' ("_":_) = Scope
     abstract' n = abstract n
     
-reservedWords = ["G", "L"]
+name cx = (:cx) <$> P.choice [
+        P.identifier tok,
+        P.try $ P.symbol tok "(" *> P.operator tok <* P.symbol tok ")"
+    ]
 
-identifier = tok $ P.munch1 (\c -> Char.isAlphaNum c || (c `elem` "'_"))
+definition cx = (,) <$> name cx <* P.reservedOp tok "=" <*> expr cx
 
-name cx = fmap (:cx) $ constrain (not . (`elem` reservedWords)) identifier
-                          P.+++ 
-                       (tok (P.char '(') *> operator <* tok (P.char ')'))
+check cx = P.symbol tok "!" *> expr cx
 
-constrain f p = do
-    n <- p
-    guard (f n)
-    return n
-
-definition cx = do
-    n <- name cx
-    constrain (== "=") (tok operatorLike)
-    def <- expr cx
-    return (n,def)
-
-operatorLike = P.munch1 (\c -> (Char.isPunctuation c || Char.isSymbol c) && not (c `elem` "(){}'_"))
-
-operator = (constrain (not . (`elem` ["=", "--"])) (tok operatorLike))
-
-infixExpr cx = (Free . (:cx) <$> operator)
-                  P.+++
-               (tok (P.char '{') *> expr cx <* tok (P.char '}'))
+infixExpr cx = P.choice [
+        (Free . (:cx) <$> P.operator tok),
+        (P.symbol tok "`" *> atom cx <* P.symbol tok "`")
+    ]
 
 parse :: Name -> String -> Term
-parse name input = head [ x | (x,[]) <- P.readP_to_S (expr name) input ]
+parse name = either (error.show) id . P.parse (expr name) "<input>"

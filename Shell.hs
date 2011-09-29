@@ -4,11 +4,12 @@ import qualified System.Console.SimpleLineEditor as Line
 import ProofCheck
 import Term
 import Parser
-import qualified Text.ParserCombinators.ReadP as P
+import qualified Text.Parsec as P
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
+import Control.Applicative
 import Control.Arrow
 import Data.Maybe (listToMaybe)
 import Debug.Trace
@@ -34,16 +35,15 @@ main = Line.initialise >> evalStateT go Map.empty
                 go
     parseLine env line = 
         case results of
-            [x] -> Just x
-            [] -> Nothing
-            ps -> trace ("Multiple Parses:\n" ++ intercalate "\n" (map show ps)) $ Nothing
+            Left e  -> trace (show e) Nothing
+            Right x -> Just x
         where
-        results = map fst . filter (null . snd) $ P.readP_to_S (parser env) (line ++ "\n")
+        results = P.parse (parser env) "<input>" $ line ++ "\n"
     
-    parser env = defn P.+++ check
+    parser env = defn <|> check
         where
         defn = (Left . second (substs env)) `fmap` definition []
-        check = (Right . substs env) `fmap` expr []
+        check = (Right . substs env) `fmap` Parser.check []
 
     getParagraph = do
         Just line <- Line.getLineEdited ">>> "

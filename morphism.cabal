@@ -54,7 +54,7 @@ Executable morphism
   Main-is:             Shell.hs
   
   -- Packages needed in order to build this package.
-  Build-depends:       base==4.*, transformers==0.2.*, containers==0.4.*, readline==1.0.*
+  Build-depends:       base==4.*, transformers==0.2.*, containers==0.4.*, readline==1.0.*, parsec==3.*, indents==0.3.*
   
   -- Modules not exported by this package.
   -- Other-modules:       
