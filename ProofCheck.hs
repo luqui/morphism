@@ -3,7 +3,7 @@
 module ProofCheck where
 
 import qualified Data.Map as Map
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Error

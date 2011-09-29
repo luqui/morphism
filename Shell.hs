@@ -7,7 +7,7 @@ import Parser
 import qualified Text.ParserCombinators.ReadP as P
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 import Control.Arrow
 import Data.Maybe (listToMaybe)
@@ -54,4 +54,4 @@ main = Line.initialise >> evalStateT go Map.empty
         fmap (line:) rest
 
 substs :: Map.Map Name Term -> Term -> Term
-substs mp t = Map.foldWithKey (\k v -> substitute v k) t mp
+substs mp t = Map.foldrWithKey (\k v -> substitute v k) t mp
