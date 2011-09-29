@@ -1,4 +1,4 @@
-module Parser (expr, definition, check, parse) where
+module Parser (expr, definition, check, whitespace, parse) where
 
 import Term
 import qualified Text.Parsec as P
@@ -6,6 +6,7 @@ import qualified Text.Parsec.Token as P
 import qualified Data.Char as Char
 import Control.Monad (guard, ap)
 import Control.Applicative
+import Control.Arrow
 
 type Parser = P.Parsec String ()
 
@@ -19,7 +20,7 @@ tok = P.makeTokenParser $ P.LanguageDef {
         P.opStart = opChars,
         P.opLetter = opChars,
         P.reservedNames = ["L","G"],
-        P.reservedOpNames = ["=","\\"],
+        P.reservedOpNames = ["=","\\","--"],
         P.caseSensitive = True
     }
     where
@@ -54,20 +55,32 @@ lambdaExpr cx = do
     names <- P.many1 (name cx)
     P.symbol tok "."
     body <- expr cx
-    return $ foldr (\n -> Lambda . abstract' n) body names
+    return $ foldr (\n -> Lambda . abstractArg n) body names
     where
-    -- don't abstract over underscores
-    abstract' ("_":_) = Scope
-    abstract' n = abstract n
+
+-- don't abstract over underscores
+abstractArg ("_":_) = Scope
+abstractArg n = abstract n
     
 name cx = (:cx) <$> P.choice [
         P.identifier tok,
         P.try $ P.symbol tok "(" *> P.operator tok <* P.symbol tok ")"
     ]
 
-definition cx = (,) <$> name cx <* P.reservedOp tok "=" <*> expr cx
+definition cx = (makeDefn =<< expr cx) <* P.reservedOp tok "=" <*> expr cx
+    where
+    makeDefn x = case nameArgs x of
+        Just (n, vs) -> return $ \body ->
+            (n, foldr (\v -> Lambda . abstractArg v) body (reverse vs))
+        Nothing -> fail "Malformed left-hand side of definition"
+    
+    nameArgs (Free n)           = Just (n, [])
+    nameArgs (Apply t (Free v)) = (id *** (v:)) <$> nameArgs t
+    nameArgs _                  = Nothing
 
 check cx = P.symbol tok "!" *> expr cx
+
+whitespace = P.whiteSpace tok
 
 infixExpr cx = P.choice [
         (Free . (:cx) <$> P.operator tok),

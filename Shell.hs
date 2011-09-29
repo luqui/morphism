@@ -22,12 +22,13 @@ main = Line.initialise >> evalStateT go Map.empty
         env <- get
         case parseLine env line of
             Nothing -> lift (putStrLn "Parse Error") >> go
-            Just (Left (name, term))
+            Just Nothing -> return ()
+            Just (Just (Left (name, term)))
                 | Set.null (freeVars term) -> modify (Map.insert name term) >> go
                 | otherwise -> do
                     lift . putStrLn $ "Error: term is not closed.  Free variables: " ++ intercalate ", " (map (showTerm . Free) (Set.toList (freeVars term)))
                     go
-            Just (Right term) -> do
+            Just (Just (Right term)) -> do
                 res <- return $ runProve ["P"] (prove term)
                 case res of
                     Left err -> lift $ putStrLn err
@@ -40,7 +41,7 @@ main = Line.initialise >> evalStateT go Map.empty
         where
         results = P.parse (parser env) "<input>" $ line ++ "\n"
     
-    parser env = defn <|> check
+    parser env = whitespace *> P.option Nothing (Just <$> (defn <|> check))
         where
         defn = (Left . second (substs env)) `fmap` definition []
         check = (Right . substs env) `fmap` Parser.check []
