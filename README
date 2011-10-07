@@ -22,13 +22,3 @@ everything that is conceivable to factor out.
 
 (3) Everything is serializable.  It is nonsense for a purely functional
 language not to have this property.  I mean, come on.
-
-(4) The database of everything:  Purely functional languages have the
-marvelous property that, because you have to state all your inputs and
-outputs explicitly, that every piece of code -- every function, helper
-function, type, ...  -- can be reused.  Unfortunately no popular
-(haha... popular) languages have mechanisms which permit such obvious
-and painless reuse of code.  So I would like some sort of databasey or
-Udony thing which really facilitates code reuse *at all scales*.  Not
-just large, encapsualted libraries, but at the miniature abstract data
-type with a few operations level, down to the one-liner level.

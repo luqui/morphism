@@ -1,0 +1,230 @@
+Here is an idea I have been working on a little while, and I think this
+project skeleton might be a nice place to experiment with it. I want to
+be able to express my assumptions about a piece of code, even if I am
+not sure what my assumptions mean precisely.  That is, assumptions can
+be kept abstract, and specified only partially with properties.
+Assumptions can be instantiated with *relatively concrete* (i.e. abstract
+in an outer context) assumptions, at which point their assumped
+properties are checked.
+
+I think I'm going to phrase them as types, since arbitrary properties
+are very difficult for a compiler to work with (when/how do we use an
+assumption).  Types give us syntactic clues about where to look.
+However, we may lift the requirement that a variable have a single
+type.
+
+So, a type expresses some information about a variable.  We might have
+the proposition:
+
+    x : Nat
+
+thus `x` is a natural number.  Or perhaps
+
+    x : Prime
+
+Indeed the latter should imply the former (if we want to stick close to
+the human subtyping intuition).
+
+To know that every `Prime` is a `Nat` is knowledge about `Prime`, thus:
+
+    Prime : ?
+
+Maybe as simple as
+
+    Prime : Subtype Nat
+
+(Allowing this is equivalent to the power set axiom)
+
+What else would we like to express.  Perhaps:
+
+    decompose : Nat -> List Prime
+
+To *prove* that a naively implemented decompose really decomposes into a
+list of primes is hard.  We would like to use the information that the
+resulting list is a list of primes without having to prove we are right.
+
+    decompose = go 2
+        where
+        go d n 
+            | d > n          = []
+            | n `mod` d == 0 = d : go d (n `div` d)
+            | otherwise      = go (d+1) n
+
+But this is too weak.  Why is `d` a prime? What if we made an error.
+This requires *documented justification*.  Like:
+
+            | n `mod` d == 0 =
+                --[ d :: Prime ] because if c divided d, then c would
+                -- divide n and we would have already divided it out.
+                d : go d (n `div` d)
+
+This is a *promise*, a forcibly inserted assumption into the context.
+This is a little tricky: suppose we have a higher-order `if` function,
+and we wrote it as
+
+        go d n = if (n `mod` d == 0)
+                    ( --[ d :: Prime ] because etc. 
+                        d : go d (n `div` d)
+                    )
+                    (d : go (d+1) n)
+
+(mind the erroneous `d : go (d+1) n`).  The `d :: Prime`
+assumption only applies to the first branch of the `if`; the reasoning
+depended on ``n `mod` d`` being true.  We must be careful not to let
+this pass as a `List Prime`.
+
+    given:
+    if :: ∀ a. Bool -> a -> a -> a
+    mod :: Nat -> Nat -> Bool
+    (==) :: Nat -> Nat -> Bool
+    n :: Nat
+    d :: Nat
+    [] :: ∀ a. List a
+    (:) :: ∀ a. a -> List a -> List a
+    Prime :: Subtype Nat
+    go :: Nat -> Nat -> List Prime
+    (+) :: Nat -> Nat -> Nat
+
+    |- if (n `mod` d == 0) ... ... :: List Prime
+     |- n `mod` d == 0 :: Bool
+      |- n `mod` d :: Nat
+       |- n :: Nat
+       |- d :: Nat
+      |- 0 :: Nat
+     |- {-[ d :: Prime ]-} d : go d (n `div` d) :: List Prime
+      d :: Prime |- d : go d (n `div` d) :: List Prime
+       d :: Prime |- d :: Prime
+       d :: Prime |- go d (n `div` d) :: Prime
+        d :: Prime |- d :: Nat
+         -- we already have d :: Nat in our assumptions.  If we didn't...
+         d :: Prime |- Prime :: Subtype Nat
+        d :: Prime |- n `div` d :: Nat
+         d :: Prime |- n :: Nat
+         d :: Prime |- d :: Nat
+     |- d : go (d+1) n :: List Prime
+      |- d : Prime
+
+*cannot deduce `d : Prime`*
+
+    |- go (d+1) n :: List Prime
+       |- d+1 :: Nat
+        |- d :: Nat
+        |- 1 :: Nat
+       |- n :: Nat
+
+And we get a good error message: cannot deduce `d :: Prime` in 
+`d : go (d+1) n`.
+
+It would be cool if we could associate some computational content with
+`Prime`.  That is, if we had a function `isPrime`, then we could replace
+the expression `{-[ d :: Prime ]-}` with a runtime assertion that checks
+`isPrime d`.  This verifies that our assumptions are consistent.
+
+Then we have preconditions.  For example,
+
+    (!!) :: ∀ a. List a -> Nat -> a
+
+does not express all the information we would like to express about
+`(!!)`e  We would like to say that the index must be less than the
+length of the list.  We could express that with a dependent type:
+
+    (!!) :: ∀ a. (xs::List a) -> Finite (length xs) -> a
+    Finite :: Nat -> Subtype Nat
+
+That is fairly clean, but does not allow us to switch the argument order
+of `(!!)`: `flip (!!)` has a less informative type.  I wonder...
+
+    flip (!!) :: ∀ a n. Finite n -> (xs::{List a | n=length xs}) -> a
+
+That could get into hard-to-typecheck land, but if we constrain the
+conditions to always be equalities we might be able to get back to
+verifiable.  The flipped version is not terribly informative though, and
+how did we know to associate the condition with `xs` instead of some
+other argument.
+
+We could also take the condition as a proof term:
+
+    (!!) :: ∀ a. (xs::List a) -> (n::Nat) -> Less n (length xs) -> a
+
+Now it's a proper argument and you must supply evidence.  That is
+annoying sometimes, other times it is enlightening.
+
+Or perhaps we can encode constraints in types. 
+
+    flip (!!) :: ∀ a. (n::Nat) -> (xs :: List a) -> [n :: Finite (length xs)] => a
+
+How did we know to transform `Finite (length xs)` into `Nat`.  Or maybe
+we didn't:
+
+    flip (!!) :: ∀ a. (n::*) -> (xs :: List a) -> [n :: Finite (length xs)] => a
+
+`n :: *` does not mean `n` is a type, it means `n` could be anything.
+
+In fact, we could take our whole type calculus this way:
+
+    (!!) :: xs -> n -> [xs :: List a, n :: Finite (length xs)] => a
+
+We still express properties as types so that we can find what we need
+(hopefully the rules will work out), but we kind of throw them around
+like properties.
+
+    flip :: ∀ a b c. (a -> b -> c) -> (b -> a -> c)
+
+means
+
+    flip :: (x -> y -> p x y) -> y -> x -> p x y
+
+or equivalently:
+
+    flip :: (x -> y -> p x y) -> x -> y -> p y x
+
+Here `(->)` is an asymmetrical binder: `var -> Type :: Type`.
+
+I wonder if `p` can be unified.  Probably not in general, at least not
+if we consider it a lambda.  But if `p x y` just means "some type
+depending on x and y", it might be doable.  Of course, we are relying on
+argument order for the second phrasing of `flip` above.
+
+Or maybe we try HOU and throw up our hands sometimes.  This is a soft
+system.
+
+We get into trouble with something like this:
+
+    foo :: (x -> p x (succ x)) -> p x x
+
+Which is kind of nonsense.  I'll bet induction looks like this nonsense
+though:
+
+    ind :: p Zero -> (\x -> p x -> p (Succ x)) -> \n -> p n
+
+(marking binders with ``\`` now)
+
+(Digression: perhaps we can formalize binders, so it is possible to
+introduce new binding constructs.  Eg `.` and `->` are just operators.
+
+Namely:
+
+    \x *** Y  =  (***) (\x. Y)
+
+And confusingly
+
+    \x. Y = (.) (\x. Y)
+
+so
+
+    (.) = id
+
+Maybe it's
+
+    \x *** Y = (\***) (\x. Y)
+
+So
+
+    (\.) = id
+
+Which could be redefined for quotation.  Might break uniform abstraction
+though.)
+
+Unifying `p` in `ind` is likely too hard for a computer.  But maybe that
+means that classical induction is not a thing we do in this type system.
+
